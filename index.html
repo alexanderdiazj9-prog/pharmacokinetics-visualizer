@@ -196,13 +196,17 @@
         }
 
         .input-group input:focus {
-            outline: 2px solid var(--amber);
+            outline: 2px solid var(--input-color, var(--ink));
             outline-offset: 1px;
         }
 
         .input-group input:disabled {
             background: var(--porcelain);
             color: var(--warm-grey);
+        }
+
+        #bodyWeightInput:focus {
+            outline: 2px solid var(--ink);
         }
 
         /* graph area */
@@ -467,6 +471,21 @@
             font-size: 14px;
             line-height: 1;
         }
+
+        #drugPanelSource {
+            white-space: nowrap;
+            overflow-x: auto;
+            display: block;
+        }
+
+        #drugPanelSource a {
+            color: var(--teal);
+            text-decoration: underline;
+        }
+
+        #drugPanelSource a:hover {
+            color: var(--amber);
+        }
     </style>
 </head>
 <body>
@@ -503,6 +522,7 @@
                 </p>
                 <ul class="modal-list">
                     <li>Parameters (absorption/elimination rates, volume of distribution, bioavailability, etc.) are drawn from existing pharmacokinetic literature, not from any individual measurement.</li>
+                    <li>Some mathematical models are intentionally simplified. Due to the highly complex nature of these biological systems, full multi-compartment accuracy is partially out of the scope of this project, compounded by a lack of widespread literature to provide definitive equations or uniform constants.</li>
                     <li>Therapeutic, toxic, and lethal thresholds may be innacurate due to wide range of reported values.</li>
                     <li>Individual variation (metabolism speed, body composition, interactions, tolerance, and more) is not fully captured.</li>
                     <li>This tool is for educational exploration only and <strong>must not be used for clinical, medical, or safety decisions</strong>. Some values or assumptions may be incomplete or incorrect.</li>
@@ -526,6 +546,9 @@
             <p class="drug-panel-label">metabolism</p>
             <p class="drug-panel-text" id="drugPanelMetabolism"></p>
 
+            <p class="drug-panel-label" id="drugPanelCaveatLabel">caveat</p>
+            <p class="drug-panel-text" id="drugPanelCaveat"></p>
+
             <p class="drug-panel-label">source</p>
             <p class="drug-panel-text" id="drugPanelSource"></p>
         </div>
@@ -537,6 +560,8 @@
             <p class="empty-state" id="emptyState">select a drug to begin</p>
         </div>
     </div>
+
+    <script src="drugDictionary.js"></script>
 
     <script>
         function f(aGut, aPlasma, ka, ke) {
@@ -622,118 +647,6 @@
 
             return {hours, concentrations};
         }
-
-        /* drug dictionary */
-
-       const drugs = {
-            caffeine: {
-                label: 'caffeine',
-                F: 1.0, // no units
-                ka: 4.94, // h^-1
-                halfLife: 5, // hours
-                vd: 0.7, // L/kg
-                defaultDose: 200, //mg
-                doseUnit: 'mg',
-                doseLabel: 'caffeine dose(mg)',
-                color: '#C4502E',
-                scaleTier: 'low',
-                model: 'oralFirstOrder',
-                ranges: {therapeuticLow: 1, therapeuticHigh: 10, toxic: 15, lethal: 80},
-                info: {
-                    route: 'oral administration',
-                    metabolism: 'hepatic, primarily via the CYP1A2 enzyme',
-                    source: 'NCBI Bookshelf; liebertpub.com/doi/10.1089/caff.2017.0011',
-                    compartments: [
-                        {label: 'GI tract', caption: 'dose enters here'},
-                        {label: 'blood', caption: 'measured concentration', highlight: true},
-                        {label: 'eliminated', caption: 'excreted or metabolized'}
-                    ],
-                    rateLabels: ['ka', 'ke']
-                },
-                ready:true
-            },
-            alcohol: {
-                label: 'alcohol',
-                vd: 0.68, // L/kg male avg is 0.68, female is 0.55
-                k1: 5.55, // h^-1 gastric emptying constant
-                k2: 7.05, // h^-1 intestinal absorption constant
-                a: 0.42/1e6, // L^2/mg^2 stomach quadratic feedback parameter
-                vmax: 470, // mg/(L*h) max elimination rate
-                km: 380, // mg/L Michaelis-Menten constant
-                doseUnit: 'std drinks',
-                doseLabel: 'alcohol dose (std drinks)',
-                defaultDose: 2,
-                color: '#2E5C6E',
-                scaleTier: 'high',
-                model: 'alcohol',
-                ranges: {drivingLimit: 800, toxic: 2500, lethal: 4000},
-                info: {
-                    route: 'oral administration',
-                    metabolism: '...',
-                    source: '...',
-                    compartments: [
-                        {label: 'stomach', caption: 'dose enters here'},
-                        {label: 'intestine', caption: 'passes through'},
-                        {label: 'blood', caption: 'measured as BAC', highlight: true},
-                        {label: 'eliminated', caption: 'rate can saturate'}
-                    ],
-                    rateLabels: ['k1', 'k2', null],
-                },
-                ready: true
-            },
-            ibuprofen: {
-                label: 'ibuprofen',
-                F: 1.0, // no units
-                ka: 1.2, // h^-1 unsure
-                halfLife: 2, // hours unsure
-                vd: 0.1, // L/kg
-                defaultDose: 200, //mg
-                doseUnit: 'mg',
-                doseLabel: 'ibuprofen dose (mg)',
-                color: '#5B6B5B',
-                scaleTier: 'low',
-                ranges: {therapeuticLow: 15, therapeuticHigh: 35, toxic: 300, lethal: 700},
-                rangeCaveat: "Ibuprofen plasma concentration correlates poorly with overdose severity, lines are rough reference points, not reliable predictors.",
-                info: {
-                    route: 'oral administration',
-                    metabolism: '...',
-                    source: '...',
-                    compartments: [
-                        {label: 'GI tract', caption: 'dose enters here'},
-                        {label: 'blood', caption: 'measured concentration', highlight: true},
-                        {label: 'eliminated', caption: 'excreted or metabolized'}
-                    ],
-                    rateLabels: ['ka', 'ke']
-                },
-                ready: true
-            },
-            acetaminophen: {
-                label: 'acetaminophen',
-                F: 0.8,
-                ka: 2.4,
-                halfLife: 2.5,
-                vd: 0.95,
-                defaultDose: 325,
-                doseUnit: 'mg',
-                doseLabel: 'acetaminophen dose (mg)',
-                color: '#A6824A',
-                scaleTier: 'low',
-                ranges: {therapeuticLow: 10, therapeuticHigh: 30, toxic: 150},
-                rangeCaveat: "Toxicity threshold (150 mg/L) reflects a clinical reference point measured specifically at 4 hours post-ingestion, actual risk depends on timing.",
-                info: {
-                    route: 'oral administration',
-                    metabolism: '...',
-                    source: '...',
-                    compartments: [
-                        {label: 'GI tract', caption: 'dose enters here'},
-                        {label: 'blood', caption: 'measured concentration', highlight: true},
-                        {label: 'eliminated', caption: 'excreted or metabolized'}
-                    ],
-                    rateLabels: ['ka', 'ke']
-                },
-                ready: true
-            }
-       };
         
        /* state */
 
@@ -779,327 +692,347 @@
        }
 
         /* rendering + add drug lists drugs not already active */
-    function renderPicker () {
-        const picker = document.getElementById('drugPicker');
-        picker.innerHTML = '';
+        function renderPicker () {
+            const picker = document.getElementById('drugPicker');
+            picker.innerHTML = '';
 
-        const available = Object.keys(drugs).filter(function(key) {
-            return !activeDrugs.includes(key); })
-            .sort();
-        
-        if (available.length === 0) {
-            const note = document.createElement('div');
-            note.className = 'empty-note';
-            note.textContent = 'all drugs active';
-            picker.appendChild(note);
-            return;
-        }
-
-        available.forEach(function(drugKey) {
-            const btn = document.createElement('button');
-            btn.textContent = drugs[drugKey].label;
-            btn.addEventListener('click', function() {
-                activeDrugs.push(drugKey);
-                picker.classList.remove('open');
-                renderAll();
+            const available = Object.keys(drugs).filter(function(key) {
+                return !activeDrugs.includes(key);
+            })
+            .sort(function(a, b) {
+                const labelA = drugs[a].label.toLowerCase();
+                const labelB = drugs[b].label.toLowerCase();
+                if (labelA < labelB) return -1;
+                if (labelA > labelB) return 1;
+                return 0;
             });
-            picker.appendChild(btn);
-        });
-        
-    }
-
-        /* rendering per-drug dose inputs */
-
-    function renderDoseInputs() {
-        const container = document.getElementById('doseInputs');
-        container.innerHTML = '';
-
-        activeDrugs.forEach(function(drugKey) {
-            const drug = drugs[drugKey];
-
-            const group = document.createElement('div');
-            group.className = 'input-group';
-
-            const label = document.createElement('label');
-            label.setAttribute('for', drugKey + 'DoseInput');
-            label.textContent = drug.doseLabel;
-
-            const input = document.createElement('input');
-            input.type = 'number';
-            input.id = drugKey + 'DoseInput';
-            input.value = doseOverrides[drugKey] !== undefined ? doseOverrides[drugKey] :drug.defaultDose;
-            input.disabled = !drug.ready; // can't dose drug without model
-
-            input.addEventListener('input', function() {
-                doseOverrides[drugKey] = parseFloat(input.value);
-                updateChart();
-            });
-
-            group.appendChild(label);
-            group.appendChild(input);
-            container.appendChild(group);
-        });
-    }
-
-        /* rendering chart */
-    function updateChart() {
-        const bw = parseFloat(document.getElementById('bodyWeightInput').value);
-        const chartDiv = document.getElementById('chart');
-        const emptyState = document.getElementById('emptyState');
-
-        const readyDrugs = activeDrugs.filter(function(key) {return drugs[key].ready;});
-
-        if (readyDrugs.length === 0) {
-            Plotly.purge(chartDiv);
-            chartDiv.style.display = 'none';
-            emptyState.style.display = 'flex';
-            return;
-        }
-
-        chartDiv.style.display = 'block';
-        emptyState.style.display = 'none';
-
-        const traces = readyDrugs.map(function(drugKey) {
-            const drug = drugs[drugKey];
-            const dose = doseOverrides[drugKey] !== undefined ? doseOverrides[drugKey] :drug.defaultDose;
-
-            let result;
-            if (drugKey === 'caffeine' || drugKey === 'ibuprofen' || drugKey === 'acetaminophen') {
-                result = simulateOralFirstOrder(dose, drug.F, drug.ka, drug.halfLife, drug.vd, bw, 0.01, 24);
-            } else if (drugKey === 'alcohol') {
-                result = simulateAlcohol(dose, drug.vd, drug.k1, drug.k2, drug.a, drug.vmax, drug.km, bw, 0.01, 24);
+            
+            if (available.length === 0) {
+                const note = document.createElement('div');
+                note.className = 'empty-note';
+                note.textContent = 'all drugs active';
+                picker.appendChild(note);
+                return;
             }
-      
-            console.log(drugKey, result);
 
-            return {
-                x: result.hours,
-                y: result.concentrations,
-                type: 'scatter',
-                mode: 'lines',
-                name: drug.label,
-                line: {color: drug.color, width: 2.5},
-                yaxis: drug.scaleTier === 'high' ? 'y2' : 'y'
-            };
-      });
-    
-    const alcoholActive = readyDrugs.includes('alcohol');
-    const safety = buildSafetyShapes(readyDrugs);
-    const layout = {
-        margin: {t: 10, r: 80, l: 60, b: 40},
-        xaxis: {title: 'time (hours)', gridcolor: '#EDEAE2'},
-        yaxis: {
-            title: 'concentration (mg/L)', 
-            gridcolor: '#EDEAE2',
-            titlefont: {color: '#5B6B5B'},
-            tickfont: {color: '#5B6B5B'},
-            range: getAxisRange(traces, 'low')
-        },
-        yaxis2: {
-            title: alcoholActive ? 'alcohol concentration (mg/L)' : 'high-scale concentration (mg/L)',
-            overlaying: 'y',
-            side: 'right',
-            titlefont: {color: '#5B6B5B'},
-            tickfont: {color: '#5B6B5B'},
-            range: getAxisRange(traces, 'high'),
-            automargin: true
-        },
-        shapes: safety.shapes,
-        annotations: safety.annotations,
-        paper_bgcolor: '#FFFFFF',
-        plot_bgcolor: '#FFFFFF',
-        font: {family: 'JetBrains Mono, monospace', size: 12, color: '#1A1D1F'},
-        showlegend: false
-    };
+            available.forEach(function(drugKey) {
+                const btn = document.createElement('button');
+                btn.textContent = drugs[drugKey].label;
+                btn.addEventListener('click', function() {
+                    activeDrugs.push(drugKey);
+                    picker.classList.remove('open');
+                    renderAll();
+                });
+                picker.appendChild(btn);
+            });
+            
+        }
+
+            /* rendering per-drug dose inputs */
+
+        function renderDoseInputs() {
+            const container = document.getElementById('doseInputs');
+            container.innerHTML = '';
+
+            activeDrugs.forEach(function(drugKey) {
+                const drug = drugs[drugKey];
+
+                const group = document.createElement('div');
+                group.className = 'input-group';
+                group.style.setProperty('--input-color', drug.color);
+
+                const label = document.createElement('label');
+                label.setAttribute('for', drugKey + 'DoseInput');
+                label.textContent = drug.doseLabel;
+
+                const input = document.createElement('input');
+                input.type = 'number';
+                input.id = drugKey + 'DoseInput';
+                input.value = doseOverrides[drugKey] !== undefined ? doseOverrides[drugKey] :drug.defaultDose;
+                input.disabled = !drug.ready; // can't dose drug without model
+
+                input.addEventListener('input', function() {
+                    doseOverrides[drugKey] = parseFloat(input.value);
+                    updateChart();
+                });
+
+                group.appendChild(label);
+                group.appendChild(input);
+                container.appendChild(group);
+            });
+        }
+
+            /* rendering chart */
+        function updateChart() {
+            const bw = parseFloat(document.getElementById('bodyWeightInput').value);
+            const chartDiv = document.getElementById('chart');
+            const emptyState = document.getElementById('emptyState');
+
+            const readyDrugs = activeDrugs.filter(function(key) {return drugs[key].ready;});
+
+            if (readyDrugs.length === 0) {
+                Plotly.purge(chartDiv);
+                chartDiv.style.display = 'none';
+                emptyState.style.display = 'flex';
+                return;
+            }
+
+            chartDiv.style.display = 'block';
+            emptyState.style.display = 'none';
+
+            const traces = readyDrugs.map(function(drugKey) {
+                const drug = drugs[drugKey];
+                const dose = doseOverrides[drugKey] !== undefined ? doseOverrides[drugKey] :drug.defaultDose;
+
+                let result;
+                if (drug.model === 'oralFirstOrder') {
+                    result = simulateOralFirstOrder(dose, drug.F, drug.ka, drug.halfLife, drug.vd, bw, 0.01, 24);
+                } else if (drug.model === 'alcohol') {
+                    result = simulateAlcohol(dose, drug.vd, drug.k1, drug.k2, drug.a, drug.vmax, drug.km, bw, 0.01, 24);
+                }
         
-    Plotly.newPlot(chartDiv, traces, layout, {displayModeBar: false, responsive: true});
+                console.log(drugKey, result);
 
-    }
-    
-    /* drug button toggler */
-    document.getElementById('addDrugButton').addEventListener('click', function() {
-        document.getElementById('drugPicker').classList.toggle('open');
-    });
-    
-    document.getElementById('bodyWeightInput').addEventListener('input', updateChart);
-
-    /* master render */
-    function renderAll() {
-        renderPills();
-        renderPicker();
-        renderDoseInputs();
-        updateChart();
-    }
-
-    renderAll();
-
-    /* info button */
-    const disclaimerOverlay = document.getElementById('disclaimerOverlay');
-    const acknowledgeButton = document.getElementById('acknowledgeButton');
-    const modalCloseButton = document.getElementById('modalCloseButton');
-    const infoButton = document.getElementById('infoButton');
-
-    function openModal(isFirstVisit) {
-        disclaimerOverlay.classList.add('open');
-        acknowledgeButton.style.display = isFirstVisit ? 'button' : 'none';
-        modalCloseButton.style.display = isFirstVisit ? 'none' : 'block';
-        document.getElementById('modalTitle').textContent = isFirstVisit ? 'before you begin' : 'limitations';
-    }
-
-    function closeModal() {
-        disclaimerOverlay.classList.remove('open');
-    }
-
-     openModal(true);
-
-    acknowledgeButton.addEventListener('click', function() {
-        closeModal();
-    });
-
-    modalCloseButton.addEventListener('click', closeModal);
-
-    infoButton.addEventListener('click', function() {
-        openModal(false);
-    });
-
-    function buildSafetyShapes(readyDrugs) {
-        const shapes = [];
-        const annotations = [];
-
-        const rangeLabels = {
-            drivingLimit: 'U.S. legal driving limit (0.08%)',
-            toxic: 'toxic threshold',
-            lethal: 'lethal threshold'
+                return {
+                    x: result.hours,
+                    y: result.concentrations,
+                    type: 'scatter',
+                    mode: 'lines',
+                    name: drug.label,
+                    line: {color: drug.color, width: 2.5},
+                    yaxis: drug.scaleTier === 'high' ? 'y2' : 'y'
+                };
+        });
+        
+        const alcoholActive = readyDrugs.includes('alcohol');
+        const safety = buildSafetyShapes(readyDrugs);
+        const layout = {
+            margin: {t: 10, r: 80, l: 60, b: 40},
+            xaxis: {title: 'time (hours)', gridcolor: '#EDEAE2'},
+            yaxis: {
+                title: 'concentration (mg/L)', 
+                gridcolor: '#EDEAE2',
+                titlefont: {color: '#5B6B5B'},
+                tickfont: {color: '#5B6B5B'},
+                range: getAxisRange(traces, 'low')
+            },
+            yaxis2: {
+                title: alcoholActive ? 'alcohol concentration (mg/L)' : 'high-scale concentration (mg/L)',
+                overlaying: 'y',
+                side: 'right',
+                titlefont: {color: '#5B6B5B'},
+                tickfont: {color: '#5B6B5B'},
+                range: getAxisRange(traces, 'high'),
+                automargin: true
+            },
+            shapes: safety.shapes,
+            annotations: safety.annotations,
+            paper_bgcolor: '#FFFFFF',
+            plot_bgcolor: '#FFFFFF',
+            font: {family: 'JetBrains Mono, monospace', size: 12, color: '#1A1D1F'},
+            showlegend: false
         };
+            
+        Plotly.newPlot(chartDiv, traces, layout, {displayModeBar: false, responsive: true});
 
-        readyDrugs.forEach(function(drugKey) {
-            const drug = drugs[drugKey];
-            const axis = drug.scaleTier === 'high' ? 'y2' : 'y';
-            if (!drug.ranges) return;
+        }
+        
+        /* drug button toggler */
+        document.getElementById('addDrugButton').addEventListener('click', function() {
+            document.getElementById('drugPicker').classList.toggle('open');
+        });
+        
+        document.getElementById('bodyWeightInput').addEventListener('input', updateChart);
 
-            // shaded therapuetic band (flat-range drugs only)
-            if (drug.ranges && drug.ranges.therapeuticLow !== undefined) {
-                shapes.push({
-                    type: 'rect',
-                    xref: 'paper', x0: 0, x1: 1,
-                    yref: axis, y0: drug.ranges.therapeuticLow, y1: drug.ranges.therapeuticHigh,
-                    fillcolor: drug.color, opacity: 0.08, line: {width: 0}
-                });
-                annotations.push({
-                    xref: 'paper', x: 0, xanchor: 'left',
-                    yref: axis, y: drug.ranges.therapeuticHigh, yanchor: 'bottom',
-                    text: drug.label + ' therapeutic range',
-                    showarrow: false,
-                    font: {color: drug.color, size: 10}
-                });
-            }
+        /* master render */
+        function renderAll() {
+            renderPills();
+            renderPicker();
+            renderDoseInputs();
+            updateChart();
+        }
 
-            // flat threshold lines (toxic/lethal/drivingLimit)
-            ['toxic', 'lethal', 'drivingLimit'].forEach(function(key) {
-                if (drug.ranges && drug.ranges[key] !== undefined) {
+        renderAll();
+
+        /* info button */
+        const disclaimerOverlay = document.getElementById('disclaimerOverlay');
+        const acknowledgeButton = document.getElementById('acknowledgeButton');
+        const modalCloseButton = document.getElementById('modalCloseButton');
+        const infoButton = document.getElementById('infoButton');
+
+        function openModal(isFirstVisit) {
+            disclaimerOverlay.classList.add('open');
+            acknowledgeButton.style.display = isFirstVisit ? 'block' : 'none';
+            modalCloseButton.style.display = isFirstVisit ? 'none' : 'block';
+            document.getElementById('modalTitle').textContent = isFirstVisit ? 'before you begin' : 'limitations';
+        }
+
+        function closeModal() {
+            disclaimerOverlay.classList.remove('open');
+        }
+
+        openModal(true);
+
+        acknowledgeButton.addEventListener('click', function() {
+            closeModal();
+        });
+
+        modalCloseButton.addEventListener('click', closeModal);
+
+        infoButton.addEventListener('click', function() {
+            openModal(false);
+        });
+
+        function buildSafetyShapes(readyDrugs) {
+            const shapes = [];
+            const annotations = [];
+
+            const rangeLabels = {
+                drivingLimit: 'U.S. legal driving limit (0.08%)',
+                toxic: 'toxic threshold',
+                lethal: 'lethal threshold'
+            };
+
+            readyDrugs.forEach(function(drugKey) {
+                const drug = drugs[drugKey];
+                const axis = drug.scaleTier === 'high' ? 'y2' : 'y';
+                if (!drug.ranges) return;
+
+                // shaded therapuetic band (flat-range drugs only)
+                if (drug.ranges && drug.ranges.therapeuticLow !== undefined) {
                     shapes.push({
-                        type: 'line',
+                        type: 'rect',
                         xref: 'paper', x0: 0, x1: 1,
-                        yref: axis, y0: drug.ranges[key], y1: drug.ranges[key],
-                        line: {color: drug.color, width: 1.5, dash: 'dot'}
+                        yref: axis, y0: drug.ranges.therapeuticLow, y1: drug.ranges.therapeuticHigh,
+                        fillcolor: drug.color, opacity: 0.08, line: {width: 0}
                     });
                     annotations.push({
-                        xref: 'paper', x: 1, xanchor: 'right',
-                        yref: axis, y: drug.ranges[key], yanchor: 'bottom',
-                        text: key === 'drivingLimit' ? rangeLabels[key] : drug.label + ' ' + rangeLabels[key],
+                        xref: 'paper', x: 0, xanchor: 'left',
+                        yref: axis, y: drug.ranges.therapeuticHigh, yanchor: 'bottom',
+                        text: drug.label + ' therapeutic range',
                         showarrow: false,
                         font: {color: drug.color, size: 10}
                     });
                 }
+
+                // flat threshold lines (toxic/lethal/drivingLimit)
+                ['toxic', 'lethal', 'drivingLimit'].forEach(function(key) {
+                    if (drug.ranges && drug.ranges[key] !== undefined) {
+                        shapes.push({
+                            type: 'line',
+                            xref: 'paper', x0: 0, x1: 1,
+                            yref: axis, y0: drug.ranges[key], y1: drug.ranges[key],
+                            line: {color: drug.color, width: 1.5, dash: 'dot'}
+                        });
+                        annotations.push({
+                            xref: 'paper', x: 1, xanchor: 'right',
+                            yref: axis, y: drug.ranges[key], yanchor: 'bottom',
+                            text: key === 'drivingLimit' ? rangeLabels[key] : drug.label + ' ' + rangeLabels[key],
+                            showarrow: false,
+                            font: {color: drug.color, size: 10}
+                        });
+                    }
+                });
+
+
             });
 
-
-        });
-
-        return {shapes: shapes, annotations: annotations};
-    }
-
-    function getAxisRange(traces, tier) {
-        const yKey = tier === 'high' ? 'y2' : 'y';
-        let max = 0;
-
-        traces.forEach(function(t) {
-            const traceAxis = t.yaxis || 'y';
-            if (traceAxis === yKey) {
-                const traceMax = Math.max(...t.y);
-                if (traceMax > max) max = traceMax;
-            }
-        });
-
-        return [0, max > 0 ? max * 3 : 10];
-    }
-
-    // info drug panel
-    const drugPanel = document.getElementById('drugPanel');
-    const drugPanelClose = document.getElementById('drugPanelClose');
-    let openPanelDrug = null;
-
-    function openDrugPanel(drugKey) {
-        const drug = drugs[drugKey];
-        if (!drug.info) return;
-
-        if(openPanelDrug === drugKey) {
-            closeDrugPanel();
-            return;
+            return {shapes: shapes, annotations: annotations};
         }
 
-        openPanelDrug = drugKey;
-        document.getElementById('drugPanelTitle').textContent = drug.label;
-        document.getElementById('drugPanelRoute').textContent = drug.info.route;
-        document.getElementById('drugPanelMetabolism').textContent = drug.info.metabolism;
-        document.getElementById('drugPanelSource').textContent = drug.info.source;
+        function getAxisRange(traces, tier) {
+            const yKey = tier === 'high' ? 'y2' : 'y';
+            let max = 0;
 
-        const grid = document.getElementById('drugPanelGrid');
-        grid.innerHTML = '';
-        const statFields = ['F', 'ka', 'halfLife', 'vd'];
-        const statLabels = {F: 'F', ka: 'ka', halfLife: 'half-life (h)', vd: 'VD (L/kg)'};
-        statFields.forEach(function(field) {
-            if(drug[field] === undefined) return;
-            const stat = document.createElement('div');
-            stat.className = 'drug-panel-stat';
-            stat.innerHTML = '<p class="drug-panel-stat-label">' + statLabels[field] + '</p>' + '<p class="drug-panel-stat-value">' + drug[field] + '</p>';
-            grid.appendChild(stat);
-        });
+            traces.forEach(function(t) {
+                const traceAxis = t.yaxis || 'y';
+                if (traceAxis === yKey) {
+                    const traceMax = Math.max(...t.y);
+                    if (traceMax > max) max = traceMax;
+                }
+            });
 
-        drugPanel.style.setProperty('--drug-color', drug.color);
-        document.getElementById('drugPanelDiagram').innerHTML = buildCompartmentDiagram(drug);
+            return [0, max > 0 ? max * 3 : 10];
+        }
 
-        drugPanel.classList.add('open');
-    }
+        // info drug panel
+        const drugPanel = document.getElementById('drugPanel');
+        const drugPanelClose = document.getElementById('drugPanelClose');
+        let openPanelDrug = null;
 
-    function closeDrugPanel() {
-        openPanelDrug = null;
-        drugPanel.classList.remove('open');
-    }
+        function openDrugPanel(drugKey) {
+            const drug = drugs[drugKey];
+            if (!drug.info) return;
 
-    drugPanelClose.addEventListener('click', closeDrugPanel);
-
-    function buildCompartmentDiagram(drug) {
-        if (!drug.info.compartments) return '';
-
-        let html = '<div class="drug-panel-diagram">';
-        drug.info.compartments.forEach(function(comp, i) {
-            const boxClass = comp.highlight ? ' highlight' : (comp.warn ? ' warn' : '');
-            html += '<div class="compartment-box' + boxClass + '">' +
-                        '<p class="compartment-label">' + comp.label + '</p>' +
-                        '<p class="compartment-caption">' + comp.caption + '</p>' +
-                    '</div>';
-            if (i < drug.info.compartments.length - 1) {
-                const rate = drug.info.rateLabels[i];
-                html += '<div class="compartment-arrow">' +
-                            '<span class="arrow-glyph">↓</span>' +
-                            (rate ? '<span>' + rate + '</span>' : '') +
-                        '</div>';
+            if(openPanelDrug === drugKey) {
+                closeDrugPanel();
+                return;
             }
-        });
-        html += '</div>';
-        return html;
-    }
+
+            openPanelDrug = drugKey;
+            document.getElementById('drugPanelTitle').textContent = drug.label;
+            document.getElementById('drugPanelRoute').textContent = drug.info.route;
+            document.getElementById('drugPanelMetabolism').textContent = drug.info.metabolism;
+            document.getElementById('drugPanelSource').innerHTML = drug.info.source;
+
+            const grid = document.getElementById('drugPanelGrid');
+            grid.innerHTML = '';
+            const statFields = ['F', 'ka', 'halfLife', 'vd'];
+            const statLabels = {F: 'F', ka: 'ka', halfLife: 'half-life (h)', vd: 'VD (L/kg)'};
+            statFields.forEach(function(field) {
+                if(drug[field] === undefined) return;
+                const stat = document.createElement('div');
+                stat.className = 'drug-panel-stat';
+                stat.innerHTML = '<p class="drug-panel-stat-label">' + statLabels[field] + '</p>' + '<p class="drug-panel-stat-value">' + drug[field] + '</p>';
+                grid.appendChild(stat);
+            });
+
+            drugPanel.style.setProperty('--drug-color', drug.color);
+            document.getElementById('drugPanelDiagram').innerHTML = buildCompartmentDiagram(drug);
+
+            drugPanel.classList.add('open');
+
+            const caveatLabel = document.getElementById('drugPanelCaveatLabel');
+            const caveatText = document.getElementById('drugPanelCaveat');
+
+            if (drug.caveat) {
+                caveatLabel.style.display = 'block';
+                caveatText.style.display = 'block';
+                caveatText.textContent = drug.caveat;
+            } else {
+                caveatLabel.style.display = 'none';
+                caveatText.style.display = 'none';
+            }
+        }
+
+        function closeDrugPanel() {
+            openPanelDrug = null;
+            drugPanel.classList.remove('open');
+        }
+
+        drugPanelClose.addEventListener('click', closeDrugPanel);
+
+        function buildCompartmentDiagram(drug) {
+            if (!drug.info.compartments) return '';
+
+            let html = '<div class="drug-panel-diagram">';
+            drug.info.compartments.forEach(function(comp, i) {
+                const boxClass = comp.highlight ? ' highlight' : (comp.warn ? ' warn' : '');
+                html += '<div class="compartment-box' + boxClass + '">' +
+                            '<p class="compartment-label">' + comp.label + '</p>' +
+                            '<p class="compartment-caption">' + comp.caption + '</p>' +
+                        '</div>';
+                if (i < drug.info.compartments.length - 1) {
+                    const rate = drug.info.rateLabels[i];
+                    html += '<div class="compartment-arrow">' +
+                                '<span class="arrow-glyph">↓</span>' +
+                                (rate ? '<span>' + rate + '</span>' : '') +
+                            '</div>';
+                }
+            });
+            html += '</div>';
+            return html;
+        }
 
     </script>
 </body>
