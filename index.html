@@ -44,9 +44,24 @@
             background: var(--porcelain);
             border-right: 1px solid var(--warm-grey);
             padding: 28px 20px;
-            overflow-y: auto;
             display: flex;
             flex-direction: column;
+            overflow: hidden;
+        }
+
+        .sidebar-top {
+            flex-shrink: 0;
+        }
+
+        .sidebar-doses {
+            flex: 1 1auto;
+            min-height: 0;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        .sidebar-bottom {
+            flex-shrink: 0;
         }
 
         .graph-area {
@@ -66,10 +81,15 @@
             margin: 0 0 12px 4px;
         }
 
+        .sidebar-doses .sidebar-label {
+            margin-left: 0;
+        }
+
         .divider {
             border: none;
             border-top: 1px solid var(--warm-grey);
             margin: 20px 0;
+            flex-shrink: 0;
         }
 
         /* left sidebar */
@@ -203,6 +223,121 @@
         .input-group input:disabled {
             background: var(--porcelain);
             color: var(--warm-grey);
+        }
+
+        .dose-group {
+            margin-bottom: 18px;
+        }
+
+        .dose-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .dose-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .dose-amount-input {
+            flex: 1 1 auto;
+            width: 0;
+            padding: 8px 10px;
+            border: 1px solid var(--warm-grey);
+            border-radius: 8px;
+            font-family: var(--font-mono);
+            font-size: 13px;
+            color: var(--ink);
+            background: #FFFFFF;
+        }
+
+        .dose-time-input {
+            flex: 0 0 76px;
+            width: 76px;
+            padding: 8px 4px;
+            text-align: center;
+            border: 1px solid var(--warm-grey);
+            border-radius: 8px;
+            font-family: var(--font-mono);
+            font-size: 13px;
+            color: var(--ink);
+            background: #FFFFFF;
+            text-align: center;
+        }
+
+        .dose-amount-input:focus,
+        .dose-time-input:focus {
+            outline: 2px solid var(--input-color, var(--ink));
+            outline-offset: 1px;
+        }
+
+        .dose-amount-input:disabled,
+        .dose-time-input:disabled {
+            background: var(--porcelain);
+            color: var(--warm-grey);
+        }
+
+        .dose-at-label,
+        .dose-hour-label {
+            font-family: var(--font-mono);
+            font-size: 12px;
+            color: var(--sage);
+            flex: 0 0 auto;
+        }
+
+        .dose-remove-btn {
+            background: none;
+            border: none;
+            border-left: 1px solid var(--warm-grey);
+            font-family: var(--font-mono);
+            font-size: 14px;
+            line-height: 1;
+            color: var(--sage);
+            cursor: pointer;
+            width: 22px;
+            height: 22px;
+            flex: 0 0 auto;
+            margin-left: 4px;
+            padding-left: 8px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: color 0.15s, background 0.15s;;
+        }
+
+        .dose-remove-btn:hover {
+            color: var(--amber);
+            background: var(--porcelain);
+        }
+
+        .add-dose-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            background: transparent;
+            border: 1.5px dashed var(--warm-grey);
+            border-radius: 999px;
+            padding: 6px 16px;
+            font-family: var(--font-mono);
+            font-size: 13px;
+            color: var(--sage);
+            cursor: pointer;
+            width: 100%;
+        }
+
+        .add-dose-btn:hover {
+            border-color: var(--sage);
+            color: var(--ink);
+        }
+
+        .add-dose-btn:disabled {
+            opacity: 0.4;
+            cursor: default;
         }
 
         #bodyWeightInput:focus {
@@ -493,21 +628,28 @@
 
         <!-- sidebar -->
         <div class ="sidebar">
-            <p class="sidebar-label">active drugs</p>
-
-            <div class ="pill-list" id="pillList"></div>
-
-            <button class="add-drug-pill" id="addDrugButton">+ add drug</button>
-            <div class="drug-picker" id="drugPicker"></div>
-
+            <div class="sidebar-top">
+                <p class="sidebar-label">active drugs</p>
+                <div class ="pill-list" id="pillList"></div>
+                <button class="add-drug-pill" id="addDrugButton">+ add drug</button>
+                <div class="drug-picker" id="drugPicker"></div>
+            </div>
+      
             <hr class="divider">
 
-            <div class="input-group">
-                <label for=""bodyWeightInput">body weight (kg)</label>
-                <input type="number" id="bodyWeightInput" value="70">
-            </div>
+            <div class="sidebar-doses">
+                <p class="sidebar-label">doses</p>
+                <div id="doseInputs"></div>
+            </div> 
+        
+            <hr class="divider">
 
-            <div id="doseInputs"></div>
+            <div class="sidebar-bottom">
+                <div class="input-group">
+                    <label for="bodyWeightInput">body weight (kg)</label>
+                    <input type="number" id="bodyWeightInput" value="70"> 
+                </div>   
+            </div>
         </div>
 
         <!-- info button -->
@@ -570,18 +712,26 @@
             return {dAGut, dAPlasma};
         }
 
-        function simulateOralFirstOrder(dose, F, ka, halfLife, vd, bw, h, tMax) {
+        function simulateOralFirstOrder(doses, F, ka, halfLife, vd, bw, h, tMax) {
             const ke = Math.log(2) / halfLife;      // halfLife is in hours
             const V = vd * bw       // vd is in L/kg, bw is in kg, and V is in L
             
             const hours = [];
             const concentrations = [];
 
-            let aGut = F * dose;
+            const sortedDoses = doses.slice().sort(function(a, b) { return a.time - b.time; });
+            let doseIndex = 0;
+
+            let aGut = 0;
             let aPlasma = 0;
 
             let t = 0;
             while (t <= tMax) {
+                while (doseIndex < sortedDoses.length && sortedDoses[doseIndex].time <= t + 1e-9) {
+                    aGut += F * sortedDoses[doseIndex].amount;
+                    doseIndex++;
+                }
+
                 hours.push(t);
                 concentrations.push(aPlasma / V);
                 
@@ -616,20 +766,24 @@
             return {dC1, dC2, dC3};
         }
         
-        function simulateAlcohol(standardDrinks, vd, k1, k2, a, vmax, km, bw, h, tMax) {
-            const doseMg = standardDrinks * 14000; // 1 std drink = 14000mg
+        function simulateAlcohol(doses, vd, k1, k2, a, vmax, km, bw, h, tMax) {
             const V = vd * bw
-            const C0 = doseMg / V;
+            const sortedDoses = doses.slice().sort(function(a,b) { return a.time - b.time; });
+            let doseIndex = 0;
 
             const hours = [];
             const concentrations = [];
 
-            let C1 = C0;
-            let C2 = 0;
-            let C3 = 0;
+            let C1 = 0, C2 = 0, C3 = 0;
 
             let t = 0;
             while (t <= tMax) {
+                while (doseIndex < sortedDoses.length && sortedDoses[doseIndex].time <= t + 1e-9) {
+                    const doseMg = sortedDoses[doseIndex].amount * 14000;
+                    C1 += doseMg / V;
+                    doseIndex++;
+                }
+
                 hours.push(t);
                 concentrations.push(C3);
 
@@ -648,6 +802,13 @@
             return {hours, concentrations};
         }
         
+        function getDoses(drugKey) {
+            if(!doseOverrides[drugKey]) {
+                doseOverrides[drugKey] = [{amount: drugs[drugKey].defaultDose, time: 0}];
+            }
+            return doseOverrides[drugKey];
+        }
+
        /* state */
 
        let activeDrugs = [];
@@ -682,6 +843,7 @@
                     closeDrugPanel();
                 }
                 activeDrugs = activeDrugs.filter(function(d) { return d !== drugKey; });
+                delete doseOverrides[drugKey];
                 renderAll();
             });
 
@@ -736,28 +898,90 @@
 
             activeDrugs.forEach(function(drugKey) {
                 const drug = drugs[drugKey];
+                const doses = getDoses(drugKey);
 
                 const group = document.createElement('div');
-                group.className = 'input-group';
+                group.className = 'input-group dose-group';
                 group.style.setProperty('--input-color', drug.color);
 
                 const label = document.createElement('label');
-                label.setAttribute('for', drugKey + 'DoseInput');
                 label.textContent = drug.doseLabel;
+                group.appendChild(label);
 
-                const input = document.createElement('input');
-                input.type = 'number';
-                input.id = drugKey + 'DoseInput';
-                input.value = doseOverrides[drugKey] !== undefined ? doseOverrides[drugKey] :drug.defaultDose;
-                input.disabled = !drug.ready; // can't dose drug without model
+                const doseList = document.createElement('div');
+                doseList.className = 'dose-list';
 
-                input.addEventListener('input', function() {
-                    doseOverrides[drugKey] = parseFloat(input.value);
+                doses.forEach(function(doseEntry, index) {
+                    const row = document.createElement('div');
+                    row.className = 'dose-row';
+
+                    const amountInput = document.createElement('input');
+                    amountInput.type = 'number';
+                    amountInput.className = 'dose-amount-input';
+                    amountInput.value = doseEntry.amount;
+                    amountInput.disabled = !drug.ready;
+                    amountInput.addEventListener('input', function() {
+                        doseEntry.amount = parseFloat(amountInput.value);
+                        updateChart();
+                    });
+
+                    const atLabel = document.createElement('span');
+                    atLabel.className = 'dose-at-label';
+                    atLabel.textContent = 'at';
+
+                    const timeInput = document.createElement('input');
+                    timeInput.type = 'number';
+                    timeInput.className = 'dose-time-input';
+                    timeInput.value = doseEntry.time;
+                    timeInput.min = 0;
+                    timeInput.step = 0.25;
+                    timeInput.disabled = !drug.ready;
+                    timeInput.addEventListener('input', function() {
+                        doseEntry.time = parseFloat(timeInput.value);
+                        updateChart();
+                    });
+                    
+                    const hLabel = document.createElement('span');
+                    hLabel.className = 'dose-hour-label';
+                    hLabel.textContent = 'h';
+
+                    row.appendChild(amountInput);
+                    row.appendChild(atLabel);
+                    row.appendChild(timeInput);
+                    row.appendChild(hLabel);
+
+                    const removeBtn = document.createElement('button');
+                    removeBtn.className = 'dose-remove-btn';
+                    removeBtn.textContent = 'x';
+
+                    if(doses.length > 1) {
+                        removeBtn.addEventListener('click', function() {
+                            doses.splice(index, 1);
+                            renderDoseInputs();
+                            updateChart();
+                        });
+                    } else {
+                        removeBtn.disabled = true;
+                        removeBtn.style.visibility = 'hidden';
+                    }
+                    row.appendChild(removeBtn);
+
+                    doseList.appendChild(row);
+                });
+                group.appendChild(doseList);
+
+                const addDoseBtn = document.createElement('button');
+                addDoseBtn.className = 'add-dose-btn';
+                addDoseBtn.textContent = '+ add dose';
+                addDoseBtn.disabled = !drug.ready;
+                addDoseBtn.addEventListener('click', function() {
+                    const lastTime = doses.length ? doses[doses.length - 1].time : 0;
+                    doses.push({amount: drug.defaultDose, time: lastTime + 4});
+                    renderDoseInputs();
                     updateChart();
                 });
+                group.appendChild(addDoseBtn);
 
-                group.appendChild(label);
-                group.appendChild(input);
                 container.appendChild(group);
             });
         }
@@ -782,13 +1006,13 @@
 
             const traces = readyDrugs.map(function(drugKey) {
                 const drug = drugs[drugKey];
-                const dose = doseOverrides[drugKey] !== undefined ? doseOverrides[drugKey] :drug.defaultDose;
+                const doses = getDoses(drugKey);
 
                 let result;
                 if (drug.model === 'oralFirstOrder') {
-                    result = simulateOralFirstOrder(dose, drug.F, drug.ka, drug.halfLife, drug.vd, bw, 0.01, 24);
+                    result = simulateOralFirstOrder(doses, drug.F, drug.ka, drug.halfLife, drug.vd, bw, 0.01, 24);
                 } else if (drug.model === 'alcohol') {
-                    result = simulateAlcohol(dose, drug.vd, drug.k1, drug.k2, drug.a, drug.vmax, drug.km, bw, 0.01, 24);
+                    result = simulateAlcohol(doses, drug.vd, drug.k1, drug.k2, drug.a, drug.vmax, drug.km, bw, 0.01, 24);
                 }
         
                 console.log(drugKey, result);
