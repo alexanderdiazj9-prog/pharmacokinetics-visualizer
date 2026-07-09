@@ -1,6 +1,7 @@
 const drugs = {
             caffeine: {
                 label: 'caffeine',
+                category: 'stimulant',
                 F: 1.0, // no units
                 ka: 4.94, // h^-1
                 halfLife: 5, // hours
@@ -24,10 +25,12 @@ const drugs = {
                     ],
                     rateLabels: ['ka', 'ke']
                 },
+                enzymeReliance: {CYP1A2: 0.95},
                 ready:true
             },
             alcohol: {
                 label: 'alcohol',
+                category: 'depressant',
                 vd: 0.68, // L/kg male avg is 0.68, female is 0.55
                 k1: 5.55, // h^-1 gastric emptying constant
                 k2: 7.05, // h^-1 intestinal absorption constant
@@ -58,6 +61,7 @@ const drugs = {
             },
             ibuprofen: {
                 label: 'ibuprofen',
+                category: 'analgesic',
                 F: 1.0, // no units
                 ka: 1.2, // h^-1 unsure
                 halfLife: 2, // hours unsure
@@ -85,6 +89,7 @@ const drugs = {
             },
             acetaminophen: {
                 label: 'acetaminophen',
+                category: 'analgesic',
                 F: 0.8,
                 ka: 2.4,
                 halfLife: 2.5,
@@ -112,6 +117,7 @@ const drugs = {
             },
             diphenhydramine: {
                 label: 'diphenhydramine',
+                category: 'depressant',
                 F: 0.72,
                 ka: 1.59,
                 halfLife: 9,
@@ -141,6 +147,7 @@ const drugs = {
             },
             melatonin: {
                 label: 'melatonin',
+                category: 'depressant',
                 F: 0.21,
                 ka: 12,
                 halfLife: 0.9,
