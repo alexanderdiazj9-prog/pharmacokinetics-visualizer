@@ -46,7 +46,7 @@ body {
 }
 
 .sidebar-doses {
-    flex: 1 1auto;
+    flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
     padding-right: 4px;
@@ -465,6 +465,40 @@ body {
     font-size: 14px;
 }
 
+.graph-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    padding-right: 48px;
+}
+
+.graph-header .graph-title {
+    margin: 0;
+}
+
+.scale-toggle {
+    background: transparent;
+    border: 1px solid var(--warm-grey);
+    border-radius: 999px;
+    padding: 6px 14px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--sage);
+    cursor: pointer;
+}
+
+.scale-toggle:hover {
+    border-color: var(--sage);
+    color: var(--ink);
+}
+
+.scale-toggle.active {
+    background: var(--ink);
+    border-color: var(-ink);
+    color: #FFFFFF;
+}
+
 /* info button */
 
 .info-button {
@@ -718,4 +752,42 @@ body {
 
 #drugPanelSource a:hover {
     color: var(--amber);
+}
+
+/* interaction card */
+
+.interaction-card {
+    display: none;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 16px;
+    padding: 14px 16px;
+    background: var(--porcelain);
+    border: 1px solid var(--warm-grey);
+    border-radius: 12px;
+}
+
+.interaction-row {
+    display :flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    flex-wrap: wrap;
+}
+
+.interaction-arrow {
+    color: var(--sage);
+}
+
+.interaction-drug {
+    font-weight: 600;
+}
+
+.interaction-text {
+    font-family: var(--font-body);
+    font-size: 13px;
+    color: var(--ink);
+    line-height: 1.5;
+    margin: 0;
 }

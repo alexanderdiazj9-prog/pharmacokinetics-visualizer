@@ -94,6 +94,68 @@ function simulateAlcohol(doses, vd, k1, k2, a, vmax, km, bw, h, tMax) {
     return {hours, concentrations};
 }
 
+function getInstantaneousKe(victimDrug, keBase, inhibitorConcAtT, inhibitorDrug) {
+    if (!victimDrug.enzymeReliance || !inhibitorDrug.inhibits) return keBase;
+
+    let combinedRatio = 1;
+    Object.keys(victimDrug.enzymeReliance).forEach(function(enzyme) {
+        const fm = victimDrug.enzymeReliance[enzyme];
+        const inhibitionData = inhibitorDrug.inhibits[enzyme];
+        if (!inhibitionData) return;
+
+        const instRatio = 1 + inhibitorConcAtT / inhibitionData.Ki;
+        const enzymeAUCratio = 1 / (1 - fm + fm / instRatio);
+        combinedRatio *= enzymeAUCratio;
+    });
+
+    return keBase / combinedRatio;
+}
+
+function simulateOralFirstOrderDynamic(doses, F, ka, halfLife, vd, bw, h, tMax, victimDrug, inhibitorDrug, inhibitorConc) {
+    const keBase = Math.log(2) / halfLife;
+    const V = vd * bw;
+    const hours = [];
+    const concentrations = [];
+    const sortedDoses = doses.slice().sort(function(a, b) { return a.time - b.time; });
+    let doseIndex = 0;
+
+    let aGut = 0;
+    let aPlasma = 0;
+    let t = 0;
+    let idx = 0;
+
+    while (t <= tMax) {
+        while (doseIndex < sortedDoses.length && sortedDoses[doseIndex].time <= t + 1e-9) {
+            aGut += F * sortedDoses[doseIndex].amount;
+            doseIndex++;
+        }
+
+        hours.push(t);
+        concentrations.push(aPlasma / V);
+
+        const I_t = inhibitorConc[idx] || 0;
+        const I_next = inhibitorConc[idx + 1] !== undefined ? inhibitorConc[idx + 1] : I_t;
+        const I_mid = (I_t + I_next) / 2;
+
+        const ke_t = getInstantaneousKe(victimDrug, keBase, I_t, inhibitorDrug);
+        const ke_mid = getInstantaneousKe(victimDrug, keBase, I_mid, inhibitorDrug);
+        const ke_next = getInstantaneousKe(victimDrug, keBase, I_next, inhibitorDrug);
+
+        const k1 = f(aGut, aPlasma, ka, ke_t);
+        const k2 = f(aGut + (h/2)*k1.dAGut, aPlasma + (h/2)*k1.dAPlasma, ka, ke_mid);
+        const k3 = f(aGut + (h/2)*k2.dAGut, aPlasma + (h/2)*k2.dAPlasma, ka, ke_mid);
+        const k4 = f(aGut + h*k3.dAGut, aPlasma + h*k3.dAPlasma, ka, ke_next);
+
+        aGut = aGut + (h/6) * (k1.dAGut + 2*k2.dAGut + 2*k3.dAGut + k4.dAGut);
+        aPlasma = aPlasma + (h/6) * (k1.dAPlasma + 2*k2.dAPlasma + 2*k3.dAPlasma + k4.dAPlasma);
+
+        t += h;
+        idx++;
+    }
+
+    return { hours, concentrations };
+}
+
 function getDoses(drugKey) {
     if(!doseOverrides[drugKey]) {
         doseOverrides[drugKey] = [{amount: drugs[drugKey].defaultDose, time: 0}];
@@ -105,6 +167,7 @@ function getDoses(drugKey) {
 
 let activeDrugs = [];
 let doseOverrides = {};
+let logScale = false;
 
 /* rendering sidebar buttons */
 
@@ -143,13 +206,26 @@ activeDrugs.forEach(function(drugKey) {
     pill.appendChild(removeBtn);
     pillList.appendChild(pill);
 });
+
+const addBtn = document.getElementById('addDrugButton');
+addBtn.style.display = activeDrugs.length >= 2 ? 'none' : 'flex';
+
 }
 
 
 const categoryLabels = {
     stimulant: 'stimulants',
     depressant: 'depressants',
-    analgesic: 'analgesics'
+    analgesic: 'analgesics',
+    antihistamine: 'antihistamines',
+    hormone: 'hormones',
+    muscle_relaxant: 'muscle relaxants',
+    antidepressant: 'antidepressants',
+    antibiotic: 'antibiotics',
+    antiarrhymthmic: 'antiarrhythmics',
+    contraceptive: 'contraceptives',
+    photosensitizer: 'photosensitizers',
+    antineoplastic: 'antineoplastics',
 };
 /* rendering + add drug lists drugs not already active */
 function renderDrugPicker () {
@@ -158,7 +234,7 @@ function renderDrugPicker () {
     resultsContainer.innerHTML = '';
 
     const available = Object.keys(drugs).filter(function(key) {
-        return !activeDrugs.includes(key);
+        return !activeDrugs.includes(key) && drugs[key].listed !== false;
     });
 
     const categorized = {};
@@ -180,7 +256,7 @@ function renderDrugPicker () {
         const empty = document.createElement('div');
         empty.className = 'drug-picker-empty';
         empty.textContent = available.length === 0 ? 'all drugs active' : 'no matches';
-        resultsContainer.appenddChild(empty);
+        resultsContainer.appendChild(empty);
         return;
     }
 
@@ -203,6 +279,7 @@ function renderDrugPicker () {
             item.style.setProperty('--drug-color', drug.color);
             item.textContent = drug.label;
             item.addEventListener('click', function () {
+                if (activeDrugs.length >= 2) return;
                 activeDrugs.push(drugKey);
                 closeDrugPicker();
                 renderAll();
@@ -332,7 +409,7 @@ function updateChart() {
     const chartDiv = document.getElementById('chart');
     const emptyState = document.getElementById('emptyState');
 
-    const readyDrugs = activeDrugs.filter(function(key) {return drugs[key].ready;});
+    const readyDrugs = activeDrugs.filter(function(key) { return drugs[key].ready; });
 
     if (readyDrugs.length === 0) {
         Plotly.purge(chartDiv);
@@ -354,54 +431,125 @@ function updateChart() {
         } else if (drug.model === 'alcohol') {
             result = simulateAlcohol(doses, drug.vd, drug.k1, drug.k2, drug.a, drug.vmax, drug.km, bw, 0.01, 24);
         }
+        return {drugKey, drug, baseline: result};
+    });
 
-        console.log(drugKey, result);
+    let interactionInfo = null;
 
+    if (traces.length === 2 && traces[0].drug.model === 'oralFirstOrder' && traces[1].drug.model === 'oralFirstOrder') {
+        const dynamicConcentrations = [
+            [...traces[0].baseline.concentrations],
+            [...traces[1].baseline.concentrations],
+        ];
+
+        for (let i = 0; i < 2; i++) {
+            const victim = traces[i];
+            const inhibitorEntry = traces[1 - i];
+
+            if (victim.drug.enzymeReliance && inhibitorEntry.drug.inhibits) {
+                const doses = getDoses(victim.drugKey);
+                const inhibitorBaselineConcs = dynamicConcentrations[1 - i];
+
+                victim.baseline = simulateOralFirstOrderDynamic(
+                    doses, victim.drug.F, victim.drug.ka, victim.drug.halfLife, victim.drug.vd, bw,
+                    0.01, 24, victim.drug, inhibitorEntry.drug, inhibitorEntry.baseline.concentrations
+                );
+
+                const sharedEnzyme = Object.keys(victim.drug.enzymeReliance).find(function(enzyme) {
+                    return inhibitorEntry.drug.inhibits[enzyme];
+                });
+
+                if (sharedEnzyme) {
+                    const Ki = inhibitorEntry.drug.inhibits[sharedEnzyme].Ki;
+                    const inhibitorCmax = Math.max(...inhibitorBaselineConcs);
+                    const keBase = Math.log(2) / victim.drug.halfLife;
+                    const keInhibited = getInstantaneousKe(victim.drug, keBase, inhibitorCmax, inhibitorEntry.drug);
+                    const percentReduction = (1 - keInhibited / keBase) * 100;
+
+                    interactionInfo = {
+                        victim: victim.drug,
+                        inhibitor: inhibitorEntry.drug,
+                        enzyme: sharedEnzyme,
+                        Ki: Ki,
+                        inhibitorCmax: inhibitorCmax,
+                        percentReduction: percentReduction
+                    };
+                }
+            }
+        }
+    }
+
+renderInteractionCard(interactionInfo);
+
+    /* rendering interaction card */
+function renderInteractionCard(interaction) {
+    const card = document.getElementById('interactionCard');
+    if (!interaction) {
+        card.style.display = 'none';
+        card.innerHTML = '';
+        return;
+    }
+
+    card.style.display = 'flex';
+
+    card.innerHTML =
+        '<div class="interaction-row">' +
+            '<span class="interaction-drug" style="color:' + interaction.inhibitor.color + '">' + interaction.inhibitor.label + '</span>' +
+            '<span class="interaction-arrow">inhibits ' + interaction.enzyme + ' →</span>' +
+            '<span class="interaction-drug" style="color:' + interaction.victim.color + '">' + interaction.victim.label + ' clearance ↓</span>' +
+        '</div>' +
+        '<p class="interaction-text">' +
+            'At ' + interaction.inhibitor.label + '\u2019s peak concentration (' + interaction.inhibitorCmax.toFixed(2) + ' mg/L), ' +
+            'competitive inhibition of ' + interaction.enzyme + ' (Ki = ' + interaction.Ki + ' mg/L) reduces ' +
+            interaction.victim.label + '\u2019s elimination rate by up to ' + interaction.percentReduction.toFixed(0) + '%.' +
+        '</p>';
+}
+
+    const plotlyTraces = traces.map(function(t) {
         return {
-            x: result.hours,
-            y: result.concentrations,
+            x: t.baseline.hours,
+            y: logScale ? t.baseline.concentrations.map(v => Math.max(v, 1e-6)) : t.baseline.concentrations,
             type: 'scatter',
             mode: 'lines',
-            name: drug.label,
-            line: {color: drug.color, width: 2.5},
-            yaxis: drug.scaleTier === 'high' ? 'y2' : 'y'
+            name: t.drug.label,
+            line: { color: t.drug.color, width: 2.5 }
         };
-});
+    });
 
-const alcoholActive = readyDrugs.includes('alcohol');
-const safety = buildSafetyShapes(readyDrugs);
-const layout = {
-    margin: {t: 10, r: 80, l: 60, b: 40},
-    xaxis: {title: 'time (hours)', gridcolor: '#EDEAE2'},
-    yaxis: {
-        title: 'concentration (mg/L)', 
-        gridcolor: '#EDEAE2',
-        titlefont: {color: '#5B6B5B'},
-        tickfont: {color: '#5B6B5B'},
-        range: getAxisRange(traces, 'low')
-    },
-    yaxis2: {
-        title: alcoholActive ? 'alcohol concentration (mg/L)' : 'high-scale concentration (mg/L)',
-        overlaying: 'y',
-        side: 'right',
-        titlefont: {color: '#5B6B5B'},
-        tickfont: {color: '#5B6B5B'},
-        range: getAxisRange(traces, 'high'),
-        automargin: true
-    },
-    shapes: safety.shapes,
-    annotations: safety.annotations,
-    paper_bgcolor: '#FFFFFF',
-    plot_bgcolor: '#FFFFFF',
-    font: {family: 'JetBrains Mono, monospace', size: 12, color: '#1A1D1F'},
-    showlegend: false
-};
-    
-Plotly.newPlot(chartDiv, traces, layout, {displayModeBar: false, responsive: true});
+    const alcoholActive = readyDrugs.includes('alcohol');
+    const safety = buildSafetyShapes(readyDrugs);
+    const layout = {
+        margin: {t: 10, r: 80, l: 60, b: 40},
+        xaxis: {title: 'time (hours)', gridcolor: '#EDEAE2'},
+        yaxis: {
+            title: 'concentration (mg/L)', 
+            type: logScale ? 'log' : 'linear',
+            gridcolor: '#EDEAE2',
+            titlefont: {color: '#5B6B5B'},
+            tickfont: {color: '#5B6B5B'},
+            range: getAxisRange(plotlyTraces)
+        },
+
+        shapes: safety.shapes,
+        annotations: safety.annotations,
+        paper_bgcolor: '#FFFFFF',
+        plot_bgcolor: '#FFFFFF',
+        font: {family: 'JetBrains Mono, monospace', size: 12, color: '#1A1D1F'},
+        showlegend: false
+    };
+        
+    Plotly.newPlot(chartDiv, plotlyTraces, layout, {displayModeBar: false, responsive: true});
 
 }
 
 document.getElementById('bodyWeightInput').addEventListener('input', updateChart);
+
+document.getElementById('scaleToggle').addEventListener('click', function() {
+    logScale = !logScale;
+    this.textContent = logScale ? 'linear scale' : 'log scale';
+    this.classList.toggle('active', logScale);
+    updateChart();
+});
 
 /* master render */
 function renderAll() {
@@ -453,7 +601,6 @@ function buildSafetyShapes(readyDrugs) {
 
     readyDrugs.forEach(function(drugKey) {
         const drug = drugs[drugKey];
-        const axis = drug.scaleTier === 'high' ? 'y2' : 'y';
         if (!drug.ranges) return;
 
         // shaded therapuetic band (flat-range drugs only)
@@ -461,12 +608,12 @@ function buildSafetyShapes(readyDrugs) {
             shapes.push({
                 type: 'rect',
                 xref: 'paper', x0: 0, x1: 1,
-                yref: axis, y0: drug.ranges.therapeuticLow, y1: drug.ranges.therapeuticHigh,
+                yref: 'y', y0: drug.ranges.therapeuticLow, y1: drug.ranges.therapeuticHigh,
                 fillcolor: drug.color, opacity: 0.08, line: {width: 0}
             });
             annotations.push({
                 xref: 'paper', x: 0, xanchor: 'left',
-                yref: axis, y: drug.ranges.therapeuticHigh, yanchor: 'bottom',
+                yref: 'y', y: drug.ranges.therapeuticHigh, yanchor: 'bottom',
                 text: drug.label + ' therapeutic range',
                 showarrow: false,
                 font: {color: drug.color, size: 10}
@@ -479,12 +626,12 @@ function buildSafetyShapes(readyDrugs) {
                 shapes.push({
                     type: 'line',
                     xref: 'paper', x0: 0, x1: 1,
-                    yref: axis, y0: drug.ranges[key], y1: drug.ranges[key],
+                    yref: 'y', y0: drug.ranges[key], y1: drug.ranges[key],
                     line: {color: drug.color, width: 1.5, dash: 'dot'}
                 });
                 annotations.push({
                     xref: 'paper', x: 1, xanchor: 'right',
-                    yref: axis, y: drug.ranges[key], yanchor: 'bottom',
+                    yref: 'y', y: drug.ranges[key], yanchor: 'bottom',
                     text: key === 'drivingLimit' ? rangeLabels[key] : drug.label + ' ' + rangeLabels[key],
                     showarrow: false,
                     font: {color: drug.color, size: 10}
@@ -498,17 +645,23 @@ function buildSafetyShapes(readyDrugs) {
     return {shapes: shapes, annotations: annotations};
 }
 
-function getAxisRange(traces, tier) {
-    const yKey = tier === 'high' ? 'y2' : 'y';
+function getAxisRange(plotlyTraces) {
     let max = 0;
+    let min = Infinity;
 
-    traces.forEach(function(t) {
-        const traceAxis = t.yaxis || 'y';
-        if (traceAxis === yKey) {
-            const traceMax = Math.max(...t.y);
-            if (traceMax > max) max = traceMax;
-        }
+    plotlyTraces.forEach(function(t) {
+        const traceMax = Math.max(...t.y);
+        if (traceMax > max) max = traceMax;
+        t.y.forEach(function(v) {
+            if (v > 1e-6 && v < min) min = v;
+        });
     });
+
+    if (logScale) {
+        const lo = Math.log10(min === Infinity ? 1e-3 : min * 0.5);
+        const hi = Math.log10(max > 0 ? max * 3 : 10);
+        return [lo, hi];
+    }
 
     return [0, max > 0 ? max * 3 : 10];
 }
@@ -592,22 +745,4 @@ function buildCompartmentDiagram(drug) {
     return html;
 }
 
-function getInhibitedKe(drug, key, inhibitorKey) {
-    if (!inhibitorKey || !drug.enzymeReliance) return le;
 
-    const inhibitor = inhibitors[inhibitorKey];
-    if (!inhibitor) return ke;
-    
-    let combinedAUCratio = 1;
-
-    Object.keys(drug.enzymeReliance).forEach(function(enzyme) {
-        const fm = drug.enzymeReliance[enzyme];
-        const inhibitionData = inhibitor.inhibits[enzyme];
-        if (!inhibitionData) return;
-
-        const enzymeAUCratio = 1/(1-fm+fm/inhibitionData.ratioIndex);
-        combinedAUCratio *= enzymeAUCratio;
-    });
-
-    return ke/combinedAUCratio;
-}
